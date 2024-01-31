@@ -1,0 +1,38 @@
+name: Go
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest-l
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: go.mod
+        
+    - name: Install dependencies
+      env:
+        GOPRIVATE: github.com/kapetacom/*
+        TOKEN: ${{ secrets.BOT_TOKEN }}
+      run: |
+        git config --global url."https://kapeta-bot:${TOKEN}@github.com".insteadOf "https://github.com"
+        # fail if go.mod and go.sum are out of sync
+        go mod verify
+        # download dependencies
+        go mod download
+    - name: Build
+      run: go build -v ./...
+    - name: Test
+      env:
+        CI: true
+        KAPETA_TOKEN: ${{ secrets.KAPETA_TOKEN }}
+        PUBSUB_EMULATOR_HOST: 367308216710
+      run: go test -timeout 1500s -v ./...
