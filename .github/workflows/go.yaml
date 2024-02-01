@@ -9,7 +9,7 @@ on:
 jobs:
 
   build:
-    runs-on: ubuntu-latest-l
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
 
@@ -32,7 +32,5 @@ jobs:
       run: go build -v ./...
     - name: Test
       env:
-        CI: true
         KAPETA_TOKEN: ${{ secrets.KAPETA_TOKEN }}
-        PUBSUB_EMULATOR_HOST: 367308216710
       run: go test -timeout 1500s -v ./...

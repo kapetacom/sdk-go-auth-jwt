@@ -4,10 +4,16 @@ go 1.21.6
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.2.0
+	github.com/kapetacom/sdk-go-config v0.0.1
 	github.com/labstack/echo-jwt/v4 v4.2.0
 	github.com/labstack/echo/v4 v4.11.4
 	github.com/lestrrat-go/jwx v1.2.28
 	github.com/stretchr/testify v1.8.4
+)
+
+require (
+	github.com/lestrrat-go/httprc v1.0.4 // indirect
+	github.com/segmentio/asm v1.2.0 // indirect
 )
 
 require (
@@ -20,6 +26,7 @@ require (
 	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
 	github.com/lestrrat-go/httpcc v1.0.1 // indirect
 	github.com/lestrrat-go/iter v1.0.2 // indirect
+	github.com/lestrrat-go/jwx/v2 v2.0.19
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
