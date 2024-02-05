@@ -32,10 +32,18 @@ type KapetaAuthenticationMetadata struct {
 
 // JWTMiddlewareFromConfig is a middleware that gets metadata from the specific resource indicating where
 // to find a keystore and uses the public key from the keystore to verify the JWT token.
+// The middleware can be disabled by setting the environment variable KAPETA_DISABLE_JWT to true.
+// The middleware can be overridden by setting the environment variable KAPETA_OVERRIDE_JWT to the URL of the keystore.
 func JWTMiddlewareFromConfig(resourceName string, provider sdkconfig.ConfigProvider) []echo.MiddlewareFunc {
+	if os.Getenv("KAPETA_DISABLE_JWT") == "true" {
+		return []echo.MiddlewareFunc{}
+	}
+	if jwtUTL := os.Getenv("KAPETA_OVERRIDE_JWT"); jwtUTL != "" {
+		return jWTMiddleware(jwtUTL)
+	}
 	baseUrl, err := provider.GetServiceAddress(resourceName, PORT_TYPE)
 	if err != nil {
-		panic(fmt.Errorf("unable to find the service address for the resource: %v", resourceName))
+		panic(err)
 	}
 	if baseUrl == "" {
 		panic(fmt.Errorf("unable to find the service address for the resource: %v", resourceName))
@@ -56,14 +64,15 @@ func JWTMiddlewareFromConfig(resourceName string, provider sdkconfig.ConfigProvi
 	}
 
 	if response.StatusCode != 200 {
-		panic(fmt.Errorf("invalid response from Kapeta authentication service: %d", response.StatusCode))
+		panic(fmt.Errorf("invalid response from Kapeta authentication service while getting metadata %d for %v", response.StatusCode, authURL))
 	}
 
 	var metadata KapetaAuthenticationMetadata
 	if err := json.NewDecoder(response.Body).Decode(&metadata); err != nil {
 		panic(fmt.Errorf("unable to unmarshal the authentication metadata from Kapeta. Error: %v", err.Error()))
 	}
-	return jWTMiddleware(baseUrl + metadata.Jwks)
+	jwksURL := baseUrl + metadata.Jwks
+	return jWTMiddleware(jwksURL)
 }
 
 // jWTMiddleware is a middleware that checks for a valid JWT token in the Authorization header
@@ -145,16 +154,16 @@ func fetchKey(url string) jwt.Keyfunc {
 		if err != nil {
 			return nil, err
 		}
+		kid := token.Header["kid"]
 
-		keyID, ok := token.Header["kid"].(string)
+		keyID, ok := kid.(string)
 		if !ok {
 			return nil, errors.New("expecting JWT header to have a key ID in the kid field")
 		}
-
 		key, found := keySet.LookupKeyID(keyID)
 
 		if !found {
-			return nil, fmt.Errorf("unable to find key %q", keyID)
+			return nil, fmt.Errorf("unable to find key %v", keyID)
 		}
 
 		var pubkey interface{}
