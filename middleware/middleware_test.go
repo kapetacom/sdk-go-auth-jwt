@@ -168,3 +168,43 @@ func TestCallingMetadataEndpoint(t *testing.T) {
 		assert.True(t, metaDataCalled)
 	})
 }
+
+func TestJWTMiddlewareOverrides(t *testing.T) {
+	t.Run("should override the middleware", func(t *testing.T) {
+		endpointCalled := false
+		svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, r.Method, "GET")
+			assert.Equal(t, r.URL.Path, "/.well-known/jwks.json")
+			// we were able to override the URL and call the endpoint
+			endpointCalled = true
+		}))
+		defer svr.Close()
+
+		os.Setenv("KAPETA_OVERRIDE_JWT", svr.URL+"/.well-known/jwks.json")
+		defer os.Unsetenv("KAPETA_OVERRIDE_JWT")
+
+		// Create a new echo instance
+		e := echo.New()
+
+		// Set the resource name and provider
+		mws := JWTMiddlewareFromConfig("resourceName", providers.NewKubernetesConfigProvider("blockRef", "systemid", "instanceId", map[string]interface{}{}))
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Add("Authorization", "bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ")
+		res := httptest.NewRecorder()
+		c := e.NewContext(req, res)
+		JWTConfigMiddleware := mws[0](func(c echo.Context) error {
+			return nil
+		})
+		_ = JWTConfigMiddleware(c)
+		assert.True(t, endpointCalled)
+	})
+	t.Run("should disable the middleware", func(t *testing.T) {
+
+		os.Setenv("KAPETA_DISABLE_JWT", "true")
+		defer os.Unsetenv("KAPETA_DISABLE_JWT")
+		// Set the resource name and provider
+		mws := JWTMiddlewareFromConfig("resourceName", providers.NewKubernetesConfigProvider("blockRef", "systemid", "instanceId", map[string]interface{}{}))
+		assert.Equal(t, 0, len(mws))
+	})
+}
