@@ -94,6 +94,10 @@ func jWTMiddleware(jwtPublicKeyLocation string, userDefinedConfig ...echojwt.Con
 		config = echojwt.Config{
 			// specify the function that returns the public key that will be used to verify the JWT
 			KeyFunc: fetchKey(jwtPublicKeyLocation),
+			Skipper: func(c echo.Context) bool {
+				header := c.Request().Header.Get("Authorization")
+				return header == ""
+			},
 		}
 	}
 	// Create a restricted group of routes that requires a valid JWT
@@ -106,7 +110,8 @@ func restricted() echo.MiddlewareFunc {
 			// Get the "user" from the context, the user is set by the JWT middleware and is a *jwt.Token
 			user := c.Get("user")
 			if user == nil {
-				return echo.ErrUnauthorized
+				// just continue
+				return next(c)
 			}
 			token := user.(*jwt.Token)
 

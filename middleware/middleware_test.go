@@ -66,12 +66,11 @@ func TestRestricted(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	t.Run("should return an error if the user is not authenticated", func(t *testing.T) {
+	t.Run("should return if the user is not authenticated", func(t *testing.T) {
 		err := restricted()(func(c echo.Context) error {
 			return nil
 		})(c)
-		assert.Error(t, err)
-		assert.Equal(t, echo.ErrUnauthorized, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("should set a jwt token on the context if the user is authenticated", func(t *testing.T) {
