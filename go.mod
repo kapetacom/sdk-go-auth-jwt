@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	github.com/avast/retry-go/v4 v4.5.1 // indirect
 	github.com/lestrrat-go/httprc v1.0.4 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 )
