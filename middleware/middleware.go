@@ -8,10 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
 
+	"github.com/avast/retry-go/v4"
 	"github.com/golang-jwt/jwt/v5"
 	sdkconfig "github.com/kapetacom/sdk-go-config/providers"
 	echojwt "github.com/labstack/echo-jwt/v4"
@@ -51,24 +53,13 @@ func JWTMiddlewareFromConfig(resourceName string, provider sdkconfig.ConfigProvi
 	baseUrl = strings.TrimSuffix(baseUrl, "/")
 	authURL := baseUrl + PATH_KAPETA_AUTHENTICATION
 
-	req, err := http.NewRequest("GET", authURL, nil)
+	responseBody, err := fetchMetadataWithRetry(authURL)
 	if err != nil {
-		panic(fmt.Errorf("unable to create a new request. Error: %v", err.Error()))
-	}
-	req.Header.Set("Accept", "application/json")
-
-	client := &http.Client{}
-	response, err := client.Do(req)
-	if err != nil {
-		panic(fmt.Errorf("unable to get the authentication metadata from Kapeta. Error: %v", err.Error()))
-	}
-
-	if response.StatusCode != 200 {
-		panic(fmt.Errorf("invalid response from Kapeta authentication service while getting metadata %d for %v", response.StatusCode, authURL))
+		panic(err)
 	}
 
 	var metadata KapetaAuthenticationMetadata
-	if err := json.NewDecoder(response.Body).Decode(&metadata); err != nil {
+	if err := json.NewDecoder(responseBody).Decode(&metadata); err != nil {
 		panic(fmt.Errorf("unable to unmarshal the authentication metadata from Kapeta. Error: %v", err.Error()))
 	}
 	jwksURL := baseUrl + metadata.Jwks
@@ -177,4 +168,39 @@ func fetchKey(url string) jwt.Keyfunc {
 		}
 		return pubkey, nil
 	}
+}
+
+func fetchMetadataWithRetry(authURL string) (io.ReadCloser, error) {
+	body, err := retry.DoWithData(
+		func() (io.ReadCloser, error) {
+			println(fmt.Sprintf("Attempting to fetch Kapeta authentication metadata from url: %v", authURL))
+			return fetchMetadata(authURL)
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
+}
+
+// fetchMetadata is a function that fetches and returns Kapeta authentication metadata from the specified URL.
+// The metadata includes the location of the keystore and the issuer of the JWT.
+func fetchMetadata(authURL string) (io.ReadCloser, error) {
+	req, err := http.NewRequest("GET", authURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create a new request. Error: %v", err.Error())
+	}
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{}
+	response, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get the authentication metadata from Kapeta. Error: %v", err.Error())
+	}
+
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("invalid response from Kapeta authentication service while getting metadata %d for %v", response.StatusCode, authURL)
+	}
+
+	return response.Body, nil
 }
